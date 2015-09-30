@@ -10,6 +10,7 @@ _u32  g_PingPacketsRecv = 0;
 _u32  g_GatewayIP = 0;
 _u32  g_StationIP = 0;
 _i16  device_mode = 0;
+int already_initialized = 0;
 
 const _u8 digits[] = "0123456789";
 
@@ -220,6 +221,29 @@ void printWifiParams(char* ssid_name, char* password, _u8 security) {
             printf("security: WPA/WPA2\n");
     }   
 }
+
+void init_device() {
+
+    _i32 retVal = -1;
+    _i32 mode;
+
+    retVal = configureSimpleLinkToDefaultState();
+
+    if(retVal < 0) {
+
+        if (retVal == DEVICE_NOT_IN_STATION_MODE)
+            CLI_Write((_u8 *)" Failed to configure the device in its default state \n\r");
+        printf("error\n");
+        LOOP_FOREVER();
+    }
+
+    CLI_Write((_u8 *)" Device is configured in default state \n\r");
+
+    mode = sl_Start(0, 0, 0);
+    device_mode = mode;
+    already_initialized = 1;
+}
+
 /*!
     \brief This function is used for connect to an Access Point
 
@@ -242,34 +266,9 @@ _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
     printWifiParams(ssid_name, password, security);
 
     _i32 retVal = -1;
+    if(already_initialized == 0)
+        init_device();
 
-    retVal = configureSimpleLinkToDefaultState();
-    if(retVal < 0) {
-
-        if (retVal == DEVICE_NOT_IN_STATION_MODE)
-            CLI_Write((_u8 *)" Failed to configure the device in its default state \n\r");
-        LOOP_FOREVER();
-    }
-
-    CLI_Write((_u8 *)" Device is configured in default state \n\r");
-
-    /*
-     * Initializing the CC3100 device
-     * Assumption is that the device is configured in station mode already
-     * and it is in its default state
-     */
-    retVal = sl_Start(0, 0, 0);
-    device_mode = retVal;
-    if ((retVal < 0) ||
-        (retVal != ROLE_STA)) {
-
-        CLI_Write((_u8 *)" Failed to start the device \n\r");
-        LOOP_FOREVER();
-    }
-
-    CLI_Write((_u8 *)" Device started as STATION \n\r");
-
-    /* Connecting to WLAN AP */
     retVal = establishConnectionWithAP(ssid_name, password, security);
     if(retVal < 0) {
 
@@ -307,78 +306,55 @@ int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
     _i32 mode = ROLE_STA;
     _i32 retVal = -1;
 
-    retVal = configureSimpleLinkToDefaultState();
-    if(retVal < 0) {
+    if(already_initialized == 0)
+        init_device();
 
-        if (retVal == DEVICE_NOT_IN_STATION_MODE)
-            CLI_Write((_u8 *)" Failed to configure the device in its default state \n\r");
+    /* Configure CC3100 to start in AP mode */
+    retVal = sl_WlanSetMode(ROLE_AP);
 
-        LOOP_FOREVER();
-    }
+    if(retVal < 0) LOOP_FOREVER();
 
-    CLI_Write((_u8 *)" Device is configured in default state \n\r");
+    /* Configure the SSID of the CC3100 */
+    retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SSID,
+                pal_Strlen(ssid_name), (_u8 *) ssid_name);
 
-    /*
-     * Assumption is that the device is configured in station mode already
-     * and it is in its default state
-     */
+    if(retVal < 0) LOOP_FOREVER();
+
+    /* Configure the Security parameter the AP mode */
+    retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SECURITY_TYPE, 1,
+                (_u8 *) &security);
+
+    if(retVal < 0) LOOP_FOREVER();
+
+
+    retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_PASSWORD, pal_Strlen(password),
+                (_u8 *) password);
+
+    if(retVal < 0) LOOP_FOREVER();
+
+        
+    retVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_CHANNEL, 1, (unsigned char*) &channel);
+
+    if(retVal < 0) LOOP_FOREVER();
+
+    retVal = sl_Stop(SL_STOP_TIMEOUT);
+
+    if(retVal < 0) LOOP_FOREVER();
+
+    CLR_STATUS_BIT(g_Status, STATUS_BIT_IP_ACQUIRED);
+
     mode = sl_Start(0, 0, 0);
     device_mode = mode;
-    if (ROLE_AP == mode) {
-
+    if (mode == ROLE_AP) {
         /* If the device is in AP mode, we need to wait for this event before doing anything */
-        while(!IS_IP_ACQUIRED(g_Status)) { _SlNonOsMainLoopTask(); }
+        while(!IS_IP_ACQUIRED(g_Status))  
+            rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ 
     }
 
     else {
 
-        /* Configure CC3100 to start in AP mode */
-        retVal = sl_WlanSetMode(ROLE_AP);
-
-        if(retVal < 0) LOOP_FOREVER();
-
-        /* Configure the SSID of the CC3100 */
-        retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SSID,
-                pal_Strlen(ssid_name), (_u8 *) ssid_name);
-
-        if(retVal < 0) LOOP_FOREVER();
-
-        /* Configure the Security parameter the AP mode */
-        retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SECURITY_TYPE, 1,
-                (_u8 *) &security);
-
-        if(retVal < 0) LOOP_FOREVER();
-
-
-        retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_PASSWORD, pal_Strlen(password),
-                (_u8 *) password);
-
-        if(retVal < 0) LOOP_FOREVER();
-
-        
-        retVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_CHANNEL, 1, (unsigned char*) &channel);
-
-        if(retVal < 0) LOOP_FOREVER();
-
-        retVal = sl_Stop(SL_STOP_TIMEOUT);
-
-        if(retVal < 0) LOOP_FOREVER();
-
-        CLR_STATUS_BIT(g_Status, STATUS_BIT_IP_ACQUIRED);
-
-        mode = sl_Start(0, 0, 0);
-        device_mode = mode;
-        if (mode == ROLE_AP) {
-            /* If the device is in AP mode, we need to wait for this event before doing anything */
-            while(!IS_IP_ACQUIRED(g_Status))  
-                _SlNonOsMainLoopTask(); 
-        }
-
-        else {
-
-            CLI_Write((_u8 *)" Device couldn't be configured in AP mode \n\r");
-            LOOP_FOREVER();
-        }
+        CLI_Write((_u8 *)" Device couldn't be configured in AP mode \n\r");
+        LOOP_FOREVER();
     }
 
     CLI_Write((_u8 *)" Device started as Access Point\n\r");
@@ -454,12 +430,13 @@ _i32 wlanSetMode(int new_mode) {
 
     if (mode == ROLE_AP) {
         /* If the device is in AP mode, we need to wait for this event before doing anything */
-        while(!IS_IP_ACQUIRED(g_Status)) { _SlNonOsMainLoopTask(); }
+        while(!IS_IP_ACQUIRED(g_Status)) { rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ }
     }
 
     /* Switch to STA role and restart */
     retVal = sl_WlanSetMode(new_mode);
     ASSERT_ON_ERROR(retVal);
+
 
     retVal = sl_Stop(SL_STOP_TIMEOUT);
     ASSERT_ON_ERROR(retVal);
@@ -568,19 +545,15 @@ _i32 configureSimpleLinkToDefaultState() {
     _u8           power = 0;
 
     _i32          retVal = -1;
-
+        
     retVal = initializeAppVariables();
     ASSERT_ON_ERROR(retVal);
-
     /* Stop WDT and initialize the system-clock of the MCU */
     stopWDT();
     initClk();
-
     /* Configure command line interface */
     CLI_Configure();
-
     retVal = wlanSetMode(ROLE_STA);
-
     /* Get the device's version-information */
     configOpt = SL_DEVICE_GENERAL_VERSION;
     configLen = sizeof(ver);
@@ -605,7 +578,7 @@ _i32 configureSimpleLinkToDefaultState() {
 
     if(retVal == 0)
         while(IS_CONNECTED(g_Status)) 
-            _SlNonOsMainLoopTask();
+            rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/
 
 
     /* Enable DHCP client*/
@@ -675,7 +648,8 @@ _i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security) {
 
     /* Wait */
     while((!IS_CONNECTED(g_Status)) || (!IS_IP_ACQUIRED(g_Status))) {
-        _SlNonOsMainLoopTask();
+        printf("Connecting...\n");
+        rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/
     }
 
     return SUCCESS;
@@ -702,7 +676,7 @@ int disconnectFromAP() {
 
     if(retVal == 0)
         while(IS_CONNECTED(g_Status)) 
-            _SlNonOsMainLoopTask();
+            rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/
 
 
     return SUCCESS;
@@ -728,7 +702,7 @@ _i32 initializeAppVariables() {
 */
 void waitClients() {
     printf("Waiting for clients\n");
-    while((!IS_IP_LEASED(g_Status)) || (!IS_STA_CONNECTED(g_Status))) { _SlNonOsMainLoopTask(); }
+    while((!IS_IP_LEASED(g_Status)) || (!IS_STA_CONNECTED(g_Status))) { rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ }
 }
 
 _u32 getStationIP() {
@@ -817,7 +791,7 @@ void ping(int interval, int size, int request_timeout, int ping_attemp, _u32 ip)
 
     while(!IS_PING_DONE(g_Status)) { 
         ASSERT_ON_ERROR("Error on ping\n");
-        _SlNonOsMainLoopTask(); 
+        rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ 
     }
 
     if (g_PingPacketsRecv == 0) {
@@ -924,28 +898,17 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     _i32  retVal = -1;
     _u32  policyVal = 0;
 
+    init_device();
+
     retVal = initializeAppVariables();
     ASSERT_ON_ERROR(retVal);
 
-    /* Stop WDT and initialize the system-clock of the MCU
-       These functions needs to be implemented in PAL */
+    /*
     stopWDT();
     initClk();
 
-    /* Configure command line interface */
     CLI_Configure();
 
-    /*
-     * Following function configures the device to default state by cleaning
-     * the persistent settings stored in NVMEM (viz. connection profiles &
-     * policies, power policy etc)
-     *
-     * Applications may choose to skip this step if the developer is sure
-     * that the device is in its default state at start of application
-     *
-     * Note that all profiles and persistent settings that were done on the
-     * device will be lost
-     */
     retVal = configureSimpleLinkToDefaultState();
     if(retVal < 0)
     {
@@ -959,11 +922,7 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
 
     CLI_Write(" Device is configured in default state \n\r");
    
-    /*
-     * Assumption is that the device is configured in station mode already
-     * and it is in its default state
-     */
-    /* Initializing the CC3100 device */
+
     retVal = sl_Start(0, 0, 0);
     if ((retVal < 0) ||
         (ROLE_STA != retVal) )
@@ -974,24 +933,24 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
 
     CLI_Write(" Device started as STATION \n\r");
 
-    if(channel >= 1 && channel <= 11) {
+/**/
+    slWlanScanParamCommand_t ScanParamConfig = {0};
 
+    if(channel >= 1 && channel <= 11) {
         printf("Scan on channel %d\n", channel);
 
-        slWlanScanParamCommand_t ScanParamConfig = {0};
         ScanParamConfig.G_Channels_mask = channel;
         ScanParamConfig.rssiThershold = - 80;
-
-        sl_WlanSet(SL_WLAN_CFG_GENERAL_PARAM_ID, WLAN_GENERAL_PARAM_OPT_SCAN_PARAMS, 
-                    sizeof(slWlanScanParamCommand_t), (_u8 *) &ScanParamConfig);
     }
-
-    else
+    else {
         printf("Scan on all channels\n");
 
+        ScanParamConfig.G_Channels_mask = 12;
+        ScanParamConfig.rssiThershold = - 80;
+    }
+    sl_WlanSet(SL_WLAN_CFG_GENERAL_PARAM_ID, WLAN_GENERAL_PARAM_OPT_SCAN_PARAMS, 
+                sizeof(slWlanScanParamCommand_t), (_u8 *) &ScanParamConfig);
 
-    /** make sure the connection policy is not set (so no scan is run in the
-      * background) */
     policyOpt = SL_CONNECTION_POLICY(0, 0, 0, 0, 0);
     retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION , policyOpt, NULL, 0);
     if (retVal < 0)
@@ -1064,7 +1023,6 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
 
     CLI_Write(" Scan Process completed \n\r");
 
-    
     /* disable scan */
     policyOpt = SL_SCAN_POLICY(0);
     retVal = sl_WlanPolicySet(SL_POLICY_SCAN , policyOpt, NULL, 0);
@@ -1076,12 +1034,12 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     }
 
     CLI_Write(" Disabled the scan policy \n\r");
-
-    /* Stop the CC3100 device */
+    
     retVal = sl_Stop(SL_STOP_TIMEOUT);
+    already_initialized = 0;
 
     if(retVal < 0)
-        LOOP_FOREVER();
+       printf("error\n");
 
     return idx;
 }

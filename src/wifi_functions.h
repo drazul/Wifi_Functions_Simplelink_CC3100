@@ -15,18 +15,6 @@
 
 #define SL_STOP_TIMEOUT        0xFFFF
 
-#define MAX_BUF_SIZE    48
-
-#define TIME2013        3565987200       /* 43 years + 11 days of leap years */
-#define YEAR2013        2013
-
-#define SEC_IN_MIN      60
-#define SEC_IN_HOUR     3600
-#define SEC_IN_DAY      86400
-
-#define GMT_TIME_ZONE_HR    0
-#define GMT_TIME_ZONE_MIN   00
-
 #define IS_PING_DONE(status_variable) GET_STATUS_BIT(status_variable, STATUS_BIT_PING_DONE)
 
 /* Application specific status/error codes */
@@ -67,7 +55,7 @@ void printPrettyMAC(_u8 *macAddressVal);
 
 int disconnectFromAP();
 
-_u8 getOwnMAC(_u8 *macAddressVal);
+void getOwnMAC(_u8 *macAddressVal);
 void setOwnMAC(_u8 *macAddress);
 
 _u32 getOwnIP();

@@ -27,7 +27,7 @@ _u16 itoa(_i16 cNum, _u8 *cString);
 void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent) {
     if(pWlanEvent == NULL) {
 
-        CLI_Write((_u8 *)" [WLAN EVENT] NULL Pointer Error \n\r");
+        CLI_Write((_u8 *)"[WLAN EVENT] NULL Pointer Error \n");
         return;
     }
     
@@ -59,10 +59,10 @@ void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent) {
 
             /* If the user has initiated 'Disconnect' request, 'reason_code' is SL_USER_INITIATED_DISCONNECTION */
             if(SL_USER_INITIATED_DISCONNECTION == pEventData->reason_code)
-                CLI_Write((_u8 *)" Device disconnected from the AP on application's request \n\r");
+                CLI_Write((_u8 *)"Device disconnected from the AP on application's request \n");
 
             else
-                CLI_Write((_u8 *)" Device disconnected from the AP on an ERROR..!! \n\r");
+                CLI_Write((_u8 *)"Device disconnected from the AP on an ERROR..!! \n");
             
         }
         break;
@@ -82,7 +82,7 @@ void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent) {
 
         default:
         {
-            CLI_Write((_u8 *)" [WLAN EVENT] Unexpected event \n\r");
+            CLI_Write((_u8 *)"[WLAN EVENT] Unexpected event \n");
         }
         break;
     }
@@ -98,7 +98,7 @@ void SimpleLinkWlanEventHandler(SlWlanEvent_t *pWlanEvent) {
 void SimpleLinkNetAppEventHandler(SlNetAppEvent_t *pNetAppEvent) {
     if(pNetAppEvent == NULL) {
 
-        CLI_Write((_u8 *)" [NETAPP EVENT] NULL Pointer Error \n\r");
+        CLI_Write((_u8 *)"[NETAPP EVENT] NULL Pointer Error \n");
         return;
     }
  
@@ -124,7 +124,7 @@ void SimpleLinkNetAppEventHandler(SlNetAppEvent_t *pNetAppEvent) {
 
         default:
         {
-            CLI_Write((_u8 *)" [NETAPP EVENT] Unexpected event \n\r");
+            CLI_Write((_u8 *)"[NETAPP EVENT] Unexpected event \n");
         }
         break;
     }
@@ -143,7 +143,7 @@ void SimpleLinkHttpServerCallback(SlHttpServerEvent_t *pHttpEvent, SlHttpServerR
      * This application doesn't work with HTTP server - Hence these
      * events are not handled here
      */
-    CLI_Write((_u8 *)" [HTTP EVENT] Unexpected event \n\r");
+    CLI_Write((_u8 *)"[HTTP EVENT] Unexpected event \n");
 }
 
 /*!
@@ -157,7 +157,7 @@ void SimpleLinkGeneralEventHandler(SlDeviceEvent_t *pDevEvent) {
      * Most of the general errors are not FATAL are to be handled
      * appropriately by the application
      */
-    CLI_Write((_u8 *)" [GENERAL EVENT] \n\r");
+    CLI_Write((_u8 *)"[GENERAL EVENT] \n");
 }
 
 /*!
@@ -169,7 +169,7 @@ void SimpleLinkSockEventHandler(SlSockEvent_t *pSock) {
 
     if(pSock == NULL) {
 
-        CLI_Write(" [SOCK EVENT] NULL Pointer Error \n\r");
+        CLI_Write("[SOCK EVENT] NULL Pointer Error \n");
         return;
     }
 
@@ -188,37 +188,37 @@ void SimpleLinkSockEventHandler(SlSockEvent_t *pSock) {
             */
             switch( pSock->socketAsyncEvent.SockTxFailData.status ) {
                 case SL_ECLOSE:
-                    CLI_Write((_u8 *)" [SOCK EVENT] Close socket operation failed to transmit all queued packets\n\r");
+                    CLI_Write((_u8 *)"[SOCK EVENT] Close socket operation failed to transmit all queued packets\n");
                 break;
 
 
                 default:
-                    CLI_Write((_u8 *)" [SOCK EVENT] Unexpected event \n\r");
+                    CLI_Write((_u8 *)"[SOCK EVENT] Unexpected event \n");
                 break;
             }
         }
         break;
 
         default:
-            CLI_Write((_u8 *)" [SOCK EVENT] Unexpected event \n\r");
+            CLI_Write((_u8 *)"[SOCK EVENT] Unexpected event \n");
         break;
     }
 }
 
 void printWifiParams(char* ssid_name, char* password, _u8 security) {
-    printf("SSID name: %s\n", ssid_name);
-    printf("password: %s\n", password);
+    CLI_Write((_u8 *)"SSID name: %s\n", ssid_name);
+    CLI_Write((_u8 *)"password: %s\n", password);
 
     switch(security) {
         case 0:
-            printf("security: OPEN\n");
+            CLI_Write((_u8 *)"security: OPEN\n");
         break;
         case 1:
-            printf("security: WEP\n");
+            CLI_Write((_u8 *)"security: WEP\n");
 
         break;
         case 2:
-            printf("security: WPA/WPA2\n");
+            CLI_Write((_u8 *)"security: WPA/WPA2\n");
     }   
 }
 
@@ -230,14 +230,11 @@ void init_device() {
     retVal = configureSimpleLinkToDefaultState();
 
     if(retVal < 0) {
-
         if (retVal == DEVICE_NOT_IN_STATION_MODE)
-            CLI_Write((_u8 *)" Failed to configure the device in its default state \n\r");
-        printf("error\n");
-        LOOP_FOREVER();
+            CLI_Write((_u8 *)"Failed to configure the device in its default state \n");
     }
 
-    CLI_Write((_u8 *)" Device is configured in default state \n\r");
+    CLI_Write((_u8 *)"Device is configured in default state \n");
 
     mode = sl_Start(0, 0, 0);
     device_mode = mode;
@@ -262,7 +259,7 @@ void init_device() {
 */
 _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
 
-    printf("Connect to AP\n");
+    CLI_Write((_u8 *)"Connect to AP\n");
     printWifiParams(ssid_name, password, security);
 
     _i32 retVal = -1;
@@ -271,12 +268,10 @@ _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
 
     retVal = establishConnectionWithAP(ssid_name, password, security);
     if(retVal < 0) {
-
-        CLI_Write((_u8 *)" Failed to establish connection w/ an AP \n\r");
-        LOOP_FOREVER();
+        CLI_Write((_u8 *)"Failed to establish connection w/ an AP \n");
     }
 
-    CLI_Write(" Connection established w/ AP and IP is acquired \n\r");
+    CLI_Write("Connection established w/ AP and IP is acquired \n");
 
     return retVal;
 }
@@ -300,7 +295,7 @@ _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
 */
 int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
 
-    printf("create AP on channel %d\n", channel);
+    CLI_Write((_u8 *)"create AP on channel %d\n", channel);
     printWifiParams(ssid_name, password, security);
 
     _i32 mode = ROLE_STA;
@@ -312,34 +307,34 @@ int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
     /* Configure CC3100 to start in AP mode */
     retVal = sl_WlanSetMode(ROLE_AP);
 
-    if(retVal < 0) LOOP_FOREVER();
+    if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
     /* Configure the SSID of the CC3100 */
     retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SSID,
                 pal_Strlen(ssid_name), (_u8 *) ssid_name);
 
-    if(retVal < 0) LOOP_FOREVER();
+    if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
     /* Configure the Security parameter the AP mode */
     retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SECURITY_TYPE, 1,
                 (_u8 *) &security);
 
-    if(retVal < 0) LOOP_FOREVER();
+    if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
 
     retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_PASSWORD, pal_Strlen(password),
                 (_u8 *) password);
 
-    if(retVal < 0) LOOP_FOREVER();
+    if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
         
     retVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_CHANNEL, 1, (unsigned char*) &channel);
 
-    if(retVal < 0) LOOP_FOREVER();
+    if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
     retVal = sl_Stop(SL_STOP_TIMEOUT);
 
-    if(retVal < 0) LOOP_FOREVER();
+    if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
     CLR_STATUS_BIT(g_Status, STATUS_BIT_IP_ACQUIRED);
 
@@ -348,16 +343,12 @@ int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
     if (mode == ROLE_AP) {
         /* If the device is in AP mode, we need to wait for this event before doing anything */
         while(!IS_IP_ACQUIRED(g_Status))  
-            rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ 
+            rtems_task_wake_after(100); 
     }
+    else
+        CLI_Write((_u8 *)"Device couldn't be configured in AP mode \n");
 
-    else {
-
-        CLI_Write((_u8 *)" Device couldn't be configured in AP mode \n\r");
-        LOOP_FOREVER();
-    }
-
-    CLI_Write((_u8 *)" Device started as Access Point\n\r");
+    CLI_Write((_u8 *)"Device started as Access Point\n");
 
     return SUCCESS;
 }
@@ -430,7 +421,7 @@ _i32 wlanSetMode(int new_mode) {
 
     if (mode == ROLE_AP) {
         /* If the device is in AP mode, we need to wait for this event before doing anything */
-        while(!IS_IP_ACQUIRED(g_Status)) { rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ }
+        while(!IS_IP_ACQUIRED(g_Status)) { rtems_task_wake_after(100);}
     }
 
     /* Switch to STA role and restart */
@@ -484,19 +475,19 @@ _i32 setWlanPower(_u8 power) {
 _i32 setPowerPolicy(_u8 policy) {
 
 
-    printf("Set power policy to ");
+    CLI_Write((_u8 *)"Set power policy to ");
     switch(policy){
         case SL_ALWAYS_ON_POLICY:
-            printf("SL_ALWAYS_ON_POLICY\n");
+            CLI_Write((_u8 *)"SL_ALWAYS_ON_POLICY\n");
         break;
 
         case SL_NORMAL_POLICY:
-            printf("SL_NORMAL_POLICY\n");
+            CLI_Write((_u8 *)"SL_NORMAL_POLICY\n");
 
         break;
 
         case SL_LOW_POWER_POLICY:
-            printf("SL_LOW_POWER_POLICY\n");
+            CLI_Write((_u8 *)"SL_LOW_POWER_POLICY\n");
     }
 
 
@@ -512,9 +503,9 @@ _i32 setPowerPolicy(_u8 policy) {
 */
 _i32 sleepWlanDevice(int time) {
 
-    printf("Sleeping Wlan Device %d ms\n", time);
+    CLI_Write((_u8 *)"Sleeping Wlan Device %d ms\n", time);
 
-    _u16 pBuff[4] = {0, 0, time, 0};
+    _u8 pBuff[4] = {0, 0, time, 0};
     return sl_WlanPolicySet(SL_POLICY_PM, SL_LONG_SLEEP_INTERVAL_POLICY, pBuff, sizeof(pBuff));
 }
 
@@ -536,8 +527,10 @@ _i32 sleepWlanDevice(int time) {
 */
 _i32 configureSimpleLinkToDefaultState() {
 
-    SlVersionFull   ver = {0};
-    _WlanRxFilterOperationCommandBuff_t  RxFilterIdMask = {0};
+    SlVersionFull ver = {.ChipFwAndPhyVersion = {.ChipId = 0, .FwVersion = 0, .PhyVersion = 0}, 
+                .NwpVersion = 0, .Padding = 0, .RomVersion = 0};
+
+    _WlanRxFilterOperationCommandBuff_t  RxFilterIdMask = {.FilterIdMask = 0, .Padding = 0};
 
     _u8           val = 1;
     _u8           configOpt = 0;
@@ -578,7 +571,7 @@ _i32 configureSimpleLinkToDefaultState() {
 
     if(retVal == 0)
         while(IS_CONNECTED(g_Status)) 
-            rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/
+            rtems_task_wake_after(100);
 
 
     /* Enable DHCP client*/
@@ -648,8 +641,8 @@ _i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security) {
 
     /* Wait */
     while((!IS_CONNECTED(g_Status)) || (!IS_IP_ACQUIRED(g_Status))) {
-        printf("Connecting...\n");
-        rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/
+        CLI_Write((_u8 *)"Connecting...\n");
+        rtems_task_wake_after(100); 
     }
 
     return SUCCESS;
@@ -668,7 +661,7 @@ int disconnectFromAP() {
      * The function returns 0 if 'Disconnected done', negative number if already disconnected
      * Wait for 'disconnection' event if 0 is returned, Ignore other return-codes
      */
-     printf("Disconnecting from AP\n");
+     CLI_Write((_u8 *)"Disconnecting from AP\n");
 
     _i32 retVal = -1;
 
@@ -676,7 +669,7 @@ int disconnectFromAP() {
 
     if(retVal == 0)
         while(IS_CONNECTED(g_Status)) 
-            rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/
+            rtems_task_wake_after(100);
 
 
     return SUCCESS;
@@ -701,8 +694,9 @@ _i32 initializeAppVariables() {
     \brief Wait thread until the first client connects
 */
 void waitClients() {
-    printf("Waiting for clients\n");
-    while((!IS_IP_LEASED(g_Status)) || (!IS_STA_CONNECTED(g_Status))) { rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ }
+    CLI_Write((_u8 *)"Waiting for clients\n");
+    while((!IS_IP_LEASED(g_Status)) || (!IS_STA_CONNECTED(g_Status))) 
+        rtems_task_wake_after(100);
 }
 
 _u32 getStationIP() {
@@ -729,7 +723,7 @@ void prettyIPv4(_u32 val, _u8* returnIP) {
     returnIP[2] = val >> 8;
     returnIP[3] = val;
 
-    sprintf(returnIP, "%u.%u.%u.%u", returnIP[3], returnIP[1], returnIP[1], returnIP[0]);
+    sCLI_Write((_u8 *)returnIP, "%u.%u.%u.%u", returnIP[3], returnIP[1], returnIP[1], returnIP[0]);
 */
 }
 
@@ -763,7 +757,7 @@ void pingToConnectedDevice(int interval, int size, int request_timeout, int ping
 */
 void ping(int interval, int size, int request_timeout, int ping_attemp, _u32 ip) {
 
-    printf("pinging to ");
+    CLI_Write((_u8 *)"pinging to ");
     printPrettyIPv4_u32(ip);
 
     SlPingStartCommand_t PingParams = {0};
@@ -791,15 +785,15 @@ void ping(int interval, int size, int request_timeout, int ping_attemp, _u32 ip)
 
     while(!IS_PING_DONE(g_Status)) { 
         ASSERT_ON_ERROR("Error on ping\n");
-        rtems_task_wake_after(100); /*_SlNonOsMainLoopTask();*/ 
+        rtems_task_wake_after(100); 
     }
 
     if (g_PingPacketsRecv == 0) {
-        CLI_Write((_u8 *)" A STATION couldn't connect to the device \n\r");
+        CLI_Write((_u8 *)"A STATION couldn't connect to the device \n");
         ASSERT_ON_ERROR(LAN_CONNECTION_FAILED);
     }
 
-    CLI_Write((_u8 *)" Device and the station are successfully connected \n\r");
+    CLI_Write((_u8 *)"Device and the station are successfully connected \n");
 }
 
 static void SimpleLinkPingReport(SlPingReport_t *pPingReport) {
@@ -808,7 +802,7 @@ static void SimpleLinkPingReport(SlPingReport_t *pPingReport) {
 
     if(pPingReport == NULL) {
 
-        CLI_Write((_u8 *)" [PING REPORT] NULL Pointer Error\r\n");
+        CLI_Write((_u8 *)"[PING REPORT] NULL Pointer Error\n");
         return;
     }
 
@@ -832,13 +826,11 @@ _u32 getHostIP() {
     return g_GatewayIP;
 }
 
-_u8 getOwnMAC(_u8 *macAddressVal) {
-    printf("get own MAC Address\n");
+void getOwnMAC(_u8 *macAddressVal) {
+    CLI_Write((_u8 *)"get own MAC Address\n");
 
     _u8 macAddressLen = SL_MAC_ADDR_LEN;
     sl_NetCfgGet(SL_MAC_ADDRESS_GET, NULL, &macAddressLen, macAddressVal);
-
-    return macAddressVal;
 }
 
 /*!
@@ -850,7 +842,7 @@ _u8 getOwnMAC(_u8 *macAddressVal) {
 */
 void setOwnMAC(_u8 *macAddressVal) {
 
-    printf("Set own MAC Address to ", 
+    CLI_Write((_u8 *)"Set own MAC Address to ", 
             macAddressVal[0], macAddressVal[1], macAddressVal[2], 
             macAddressVal[3], macAddressVal[4], macAddressVal[5]);
 
@@ -868,11 +860,11 @@ void printPrettyIPv4_u32(_u32 ip) {
 }
 
 void printPrettyIPv4_char(_u8* ip) {
-    printf("IP Address %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+    CLI_Write((_u8 *)"IP Address %u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
 }
 
 void printPrettyMAC(_u8 *macAddressVal) {
-    printf("MAC Address %02X:%02X:%02X:%02X:%02X:%02X\n", 
+    CLI_Write((_u8 *)"MAC Address %02X:%02X:%02X:%02X:%02X:%02X\n", 
         macAddressVal[0], macAddressVal[1], macAddressVal[2], 
         macAddressVal[3], macAddressVal[4], macAddressVal[5]);
 }
@@ -888,9 +880,10 @@ void printPrettyMAC(_u8 *macAddressVal) {
 */
 int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries) {
 
-    printf("scan wifi\n");
+    CLI_Write((_u8 *)"scan wifi\n");
 
-    Sl_WlanNetworkEntry_t netentry = {0};
+    Sl_WlanNetworkEntry_t netentry = {.bssid = '0', .reserved = 0, . rssi = 0,
+                .sec_type = 0, .ssid = '0', .ssid_len = 1};
     _u8   policyOpt = 0;
     _u16  idx = 0;
     _u16  runningIdx = 0;
@@ -903,47 +896,16 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     retVal = initializeAppVariables();
     ASSERT_ON_ERROR(retVal);
 
-    /*
-    stopWDT();
-    initClk();
-
-    CLI_Configure();
-
-    retVal = configureSimpleLinkToDefaultState();
-    if(retVal < 0)
-    {
-        if (DEVICE_NOT_IN_STATION_MODE == retVal)
-        {
-            CLI_Write(" Failed to configure the device in its default state \n\r");
-        }
-
-        LOOP_FOREVER();
-    }
-
-    CLI_Write(" Device is configured in default state \n\r");
-   
-
-    retVal = sl_Start(0, 0, 0);
-    if ((retVal < 0) ||
-        (ROLE_STA != retVal) )
-    {
-        CLI_Write(" Failed to start the device \n\r");
-        LOOP_FOREVER();
-    }
-
-    CLI_Write(" Device started as STATION \n\r");
-
-/**/
     slWlanScanParamCommand_t ScanParamConfig = {0};
 
     if(channel >= 1 && channel <= 11) {
-        printf("Scan on channel %d\n", channel);
+        CLI_Write((_u8 *)"Scan on channel %d\n", channel);
 
         ScanParamConfig.G_Channels_mask = channel;
         ScanParamConfig.rssiThershold = - 80;
     }
     else {
-        printf("Scan on all channels\n");
+        CLI_Write((_u8 *)"Scan on all channels\n");
 
         ScanParamConfig.G_Channels_mask = 12;
         ScanParamConfig.rssiThershold = - 80;
@@ -955,8 +917,8 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION , policyOpt, NULL, 0);
     if (retVal < 0)
     {
-        CLI_Write(" Failed to set the connection policy \n\r");
-        LOOP_FOREVER();
+        CLI_Write("Failed to set the connection policy \n");
+        CLI_Write((_u8 *)"Error\n");
     }
 
     /* enable scan */
@@ -965,15 +927,15 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     /* set scan cycle to 10 seconds */
     policyVal = 10;
 
-    CLI_Write(" Enabling and configuring the scan policy \n\r");
+    CLI_Write("Enabling and configuring the scan policy \n");
 
     /* set scan policy - this starts the scan */
     retVal = sl_WlanPolicySet(SL_POLICY_SCAN , policyOpt,
                             (_u8 *)&policyVal, sizeof(policyVal));
     if (retVal < 0)
     {
-        CLI_Write(" Failed to Enable the scan policy \n\r");
-        LOOP_FOREVER();
+        CLI_Write("Failed to Enable the scan policy \n");
+        CLI_Write((_u8 *)"Error\n");
     }
 
     /* delay 3 second to verify scan is started */
@@ -1002,8 +964,8 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
         runningIdx--;
         retVal = sl_WlanGetNetworkList(runningIdx, numOfEntries,
                                    &netentry);
-        if(retVal < numOfEntries) {
-            printf("No wifi found\n");
+        if(retVal < (int) numOfEntries) {
+            CLI_Write((_u8 *)"No wifi found\n");
             return 0;
         }
 
@@ -1021,7 +983,7 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
 
     } while (runningIdx > 0);
 
-    CLI_Write(" Scan Process completed \n\r");
+    CLI_Write("Scan Process completed \n");
 
     /* disable scan */
     policyOpt = SL_SCAN_POLICY(0);
@@ -1029,17 +991,17 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
 
     if (retVal < 0)
     {
-        CLI_Write(" Failed to to disable the scan policy \n\r");
-        LOOP_FOREVER();
+        CLI_Write("Failed to to disable the scan policy \n");
+        CLI_Write((_u8 *)"Error\n");
     }
 
-    CLI_Write(" Disabled the scan policy \n\r");
+    CLI_Write("Disabled the scan policy \n");
     
     retVal = sl_Stop(SL_STOP_TIMEOUT);
     already_initialized = 0;
 
     if(retVal < 0)
-       printf("error\n");
+       CLI_Write((_u8 *)"error\n");
 
     return idx;
 }
@@ -1060,7 +1022,7 @@ int getLessSaturatedChannel() {
         num_entries = scanWifi(scan_table_size, i, netEntries);
         
         for(j = 0; j < num_entries; j++)
-            printf("SSID: %s\n", netEntries[j].ssid);
+            CLI_Write((_u8 *)"SSID: %s\n", netEntries[j].ssid);
 
         if(num_entries < less_num_entries) {
             less_channel = i;

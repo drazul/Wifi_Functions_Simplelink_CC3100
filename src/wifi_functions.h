@@ -32,6 +32,24 @@ typedef enum{
 
 } e_AppStatusCodes;
 
+typedef enum {
+
+	NOT_CONNECTED = 0,
+	MODE_AP = 1,
+	MODE_STATION = 2
+
+} ConnectionMode;
+
+typedef struct {
+
+	char* ssid_name;
+	char* password;
+	_u8 security;
+	int channel;
+	ConnectionMode mode;
+
+} WifiConnectionState;
+
 int generateAP(char* ssid_name, char* password, _u8 security, int channel);
 _i32 connectToAP(char* ssid_name, char* password, _u8 security);
 _i32 wlanSetMode(int new_mode);
@@ -62,9 +80,12 @@ _u32 getOwnIP();
 _u32 getHostIP();
 _u32 getStationIP();
 
-int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries);
+int scanWifi(int scan_table_size, int channel, int timeout, Sl_WlanNetworkEntry_t *netEntries);
+int scanWifiRestoreState(int scan_table_size, int channel, int timeout, Sl_WlanNetworkEntry_t *netEntries);
 int getLessSaturatedChannel();
 
+WifiConnectionState getWifiState();
+void setWifiState(WifiConnectionState state);
 
 
 #endif

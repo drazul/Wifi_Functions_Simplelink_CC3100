@@ -12,6 +12,9 @@ _u32  g_StationIP = 0;
 _i16  device_mode = 0;
 int already_initialized = 0;
 
+WifiConnectionState connection_state = { .ssid_name = "", .password = "", 
+                    .security = 0, .channel = -1, .mode = NOT_CONNECTED}; ;
+
 const _u8 digits[] = "0123456789";
 
 static void SimpleLinkPingReport(SlPingReport_t *pPingReport);
@@ -205,11 +208,11 @@ void SimpleLinkSockEventHandler(SlSockEvent_t *pSock) {
     }
 }
 
-void printWifiParams(char* ssid_name, char* password, _u8 security) {
-    CLI_Write((_u8 *)"SSID name: %s\n", ssid_name);
-    CLI_Write((_u8 *)"password: %s\n", password);
+void printWifiParams() {
+    CLI_Write((_u8 *)"SSID name: %s\n", connection_state.ssid_name);
+    CLI_Write((_u8 *)"password: %s\n", connection_state.password);
 
-    switch(security) {
+    switch(connection_state.security) {
         case 0:
             CLI_Write((_u8 *)"security: OPEN\n");
         break;
@@ -220,6 +223,15 @@ void printWifiParams(char* ssid_name, char* password, _u8 security) {
         case 2:
             CLI_Write((_u8 *)"security: WPA/WPA2\n");
     }   
+}
+
+void setWifiConnectionState(char *ssid_name, char* password, _u8 security,
+                                 int channel, ConnectionMode mode) {
+    connection_state.ssid_name = ssid_name;
+    connection_state.password = password;
+    connection_state.security = security;
+    connection_state.channel = -1; 
+    connection_state.mode = mode;
 }
 
 void init_device() {
@@ -258,15 +270,18 @@ void init_device() {
     \return         On success, zero is returned. On error, negative is returned
 */
 _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
+    setWifiConnectionState(ssid_name, password, security, -1, MODE_STATION);
 
     CLI_Write((_u8 *)"Connect to AP\n");
-    printWifiParams(ssid_name, password, security);
+    printWifiParams();
 
     _i32 retVal = -1;
     if(already_initialized == 0)
         init_device();
 
-    retVal = establishConnectionWithAP(ssid_name, password, security);
+    retVal = establishConnectionWithAP(connection_state.ssid_name, 
+        connection_state.password, connection_state.security);
+
     if(retVal < 0) {
         CLI_Write((_u8 *)"Failed to establish connection w/ an AP \n");
     }
@@ -295,8 +310,10 @@ _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
 */
 int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
 
-    CLI_Write((_u8 *)"create AP on channel %d\n", channel);
-    printWifiParams(ssid_name, password, security);
+    setWifiConnectionState(ssid_name, password, security, channel, MODE_AP);
+
+    CLI_Write((_u8 *)"create AP on channel %d\n", connection_state.channel);
+    printWifiParams();
 
     _i32 mode = ROLE_STA;
     _i32 retVal = -1;
@@ -311,24 +328,27 @@ int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
 
     /* Configure the SSID of the CC3100 */
     retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SSID,
-                pal_Strlen(ssid_name), (_u8 *) ssid_name);
+                pal_Strlen(connection_state.ssid_name), 
+                    (_u8 *) connection_state.ssid_name);
 
     if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
     /* Configure the Security parameter the AP mode */
     retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_SECURITY_TYPE, 1,
-                (_u8 *) &security);
+                (_u8 *) &connection_state.security);
 
     if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
 
-    retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_PASSWORD, pal_Strlen(password),
-                (_u8 *) password);
+    retVal = sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_PASSWORD, 
+                pal_Strlen(connection_state.password),
+                    (_u8 *) connection_state.password);
 
     if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
         
-    retVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_CHANNEL, 1, (unsigned char*) &channel);
+    retVal=sl_WlanSet(SL_WLAN_CFG_AP_ID, WLAN_AP_OPT_CHANNEL, 1, 
+                (unsigned char*) &connection_state.channel);
 
     if(retVal < 0) CLI_Write((_u8 *)"Error\n");
 
@@ -870,15 +890,42 @@ void printPrettyMAC(_u8 *macAddressVal) {
 }
 
 /*!
-    \brief Get all available WiFi networks
+    \brief Get all available WiFi networks and restore previous state
 
     \param[in]  scan_table_size the maximum wifi networks to return
 
     \param[in] channel channel where scan. Have values between 1-11. Other value means all channels
 
+    \param[in] timeout timeout in second for wifi network scan
+
     \param[out] netEntries array of found WiFi networks
 */
-int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries) {
+int scanWifiRestoreState(int scan_table_size, int channel, int timeout, 
+                        Sl_WlanNetworkEntry_t *netEntries) {
+    int idx = 0;
+    WifiConnectionState wifi_state = getWifiState();
+
+    idx = scanWifi(scan_table_size, channel, timeout, netEntries);
+
+    setWifiState(wifi_state);
+
+    return idx;
+}
+
+/*!
+    \brief Get all available WiFi networks
+
+    \param[in] scan_table_size the maximum wifi networks to return
+
+    \param[in] channel channel where scan. Have values between 1-11. Other value means all channels
+
+    \param[in] timeout timeout in second for wifi network scan
+
+    \param[out] netEntries array of found WiFi networks
+
+    \note this function ends turning off the device, if you want to keep using it set on again
+*/
+int scanWifi(int scan_table_size, int channel, int timeout, Sl_WlanNetworkEntry_t *netEntries) {
 
     CLI_Write((_u8 *)"scan wifi\n");
 
@@ -891,6 +938,9 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     _i32  retVal = -1;
     _u32  policyVal = 0;
 
+    if (already_initialized == 1)
+        sl_Stop(0);
+    
     init_device();
 
     retVal = initializeAppVariables();
@@ -938,8 +988,8 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
         CLI_Write((_u8 *)"Error\n");
     }
 
-    /* delay 3 second to verify scan is started */
-    rtems_task_wake_after(3000);
+    /* delay "timeout" second to verify scan is started */
+    rtems_task_wake_after(timeout * 1000);
 
     /* get scan results - all 20 entries in one transaction */
     runningIdx = 0;
@@ -1003,6 +1053,8 @@ int scanWifi(int scan_table_size, int channel, Sl_WlanNetworkEntry_t *netEntries
     if(retVal < 0)
        CLI_Write((_u8 *)"error\n");
 
+    setWifiConnectionState("", "", 0, -1, NOT_CONNECTED);
+
     return idx;
 }
 
@@ -1019,7 +1071,7 @@ int getLessSaturatedChannel() {
     
     for(i = 1; i <= 11; i++) {
         
-        num_entries = scanWifi(scan_table_size, i, netEntries);
+        num_entries = scanWifi(scan_table_size, i, 3, netEntries);
         
         for(j = 0; j < num_entries; j++)
             CLI_Write((_u8 *)"SSID: %s\n", netEntries[j].ssid);
@@ -1032,3 +1084,29 @@ int getLessSaturatedChannel() {
 
     return less_channel;
 }
+
+/*!
+    \brief Get the wifi connection state
+
+    \return the wifi connection state
+*/
+WifiConnectionState getWifiState() {
+    return connection_state;
+}
+
+/*!
+    \brief Set the wifi connection state
+*/
+void setWifiState(WifiConnectionState state) {
+
+    switch(state.mode) {
+        case MODE_AP:
+            generateAP(state.ssid_name, state.password, 
+                state.security, state.channel);
+        break;
+        case MODE_STATION:
+            connectToAP(state.ssid_name, state.password, 
+                state.security);
+    }
+}
+

@@ -42,10 +42,10 @@ typedef enum {
 
 typedef struct {
 
-	char* ssid_name;
-	char* password;
+	_i8 ssid_name[32];
+	_i8 password[32];
 	_u8 security;
-	int channel;
+	_u32 channel;
 	ConnectionMode mode;
 
 } WifiConnectionState;
@@ -71,6 +71,8 @@ void printPrettyIPv4_char(_u8* ip);
 
 void printPrettyMAC(_u8 *macAddressVal);
 
+void printWifiParams(WifiConnectionState state);
+
 int disconnectFromAP();
 
 void getOwnMAC(_u8 *macAddressVal);
@@ -87,5 +89,10 @@ int getLessSaturatedChannel();
 WifiConnectionState getWifiState();
 void setWifiState(WifiConnectionState state);
 
+_i16 saveCurrentProfile();
+_i16 saveProfile(char* ssid_name, char* password, _u8 security, int channel);
+_i16 getProfile(_i16 index, WifiConnectionState *profile);
+
+_i16 restoreProfile(int index);
 
 #endif

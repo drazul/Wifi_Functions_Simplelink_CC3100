@@ -174,11 +174,12 @@ void SimpleLinkSockEventHandler(SlSockEvent_t *pSock) {
     }
 }
 
-void printWifiParams() {
-    CLI_Write((_u8 *)"SSID name: %s\n", _connection_state.ssid_name);
-    CLI_Write((_u8 *)"password: %s\n", _connection_state.password);
+void printWifiParams(WifiConnectionState state) {
+    CLI_Write((_u8 *)"SSID name: %s\n", state.ssid_name);
+    CLI_Write((_u8 *)"channel: %d\n", state.channel);
+    CLI_Write((_u8 *)"password: %s\n", state.password);
 
-    switch(_connection_state.security) {
+    switch(state.security) {
         case 0:
             CLI_Write((_u8 *)"security: OPEN\n");
         break;
@@ -188,16 +189,25 @@ void printWifiParams() {
         break;
         case 2:
             CLI_Write((_u8 *)"security: WPA/WPA2\n");
-    }   
+    }
 }
 
-void setWifiConnectionState(char *ssid_name, char* password, _u8 security,
+void printCurrentWifiParams() {
+    printWifiParams(_connection_state);
+}
+
+WifiConnectionState setWifiConnectionState(char *ssid_name, char* password, _u8 security,
                                  int channel, ConnectionMode mode) {
-    _connection_state.ssid_name = ssid_name;
-    _connection_state.password = password;
-    _connection_state.security = security;
-    _connection_state.channel = channel; 
-    _connection_state.mode = mode;
+    WifiConnectionState state = {
+        .security = security,
+        .channel = channel,
+        .mode = mode
+    };
+
+    pal_Memcpy(state.ssid_name, ssid_name, pal_Strlen(ssid_name));
+    pal_Memcpy(state.password, password, pal_Strlen(password));
+    
+    return state;
 }
 
 void init_device() {
@@ -236,10 +246,10 @@ void init_device() {
     \return         On success, zero is returned. On error, negative is returned
 */
 _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
-    setWifiConnectionState(ssid_name, password, security, -1, MODE_STATION);
+    _connection_state = setWifiConnectionState(ssid_name, password, security, -1, MODE_STATION);
 
     CLI_Write((_u8 *)"Connect to AP\n");
-    printWifiParams();
+    printCurrentWifiParams();
 
     _i32 retVal = -1;
     if(_already_initialized == 0)
@@ -276,10 +286,10 @@ _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
 */
 int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
 
-    setWifiConnectionState(ssid_name, password, security, channel, MODE_AP);
+    _connection_state = setWifiConnectionState(ssid_name, password, security, channel, MODE_AP);
 
     CLI_Write((_u8 *)"create AP on channel %d\n", _connection_state.channel);
-    printWifiParams();
+    printCurrentWifiParams();
 
     _i32 mode = ROLE_STA;
     _i32 retVal = -1;
@@ -486,10 +496,7 @@ _i32 configureSimpleLinkToDefaultState() {
     retVal = sl_DevGet(SL_DEVICE_GENERAL_CONFIGURATION, &configOpt, &configLen, (_u8 *) (&ver));
     ASSERT_ON_ERROR(retVal);
 
-    retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION, SL_CONNECTION_POLICY(1, 0, 0, 0, 1), NULL, 0);
-    ASSERT_ON_ERROR(retVal);
-
-    retVal = sl_WlanProfileDel(0xFF);
+    retVal = sl_WlanPolicySet(SL_POLICY_CONNECTION, SL_CONNECTION_POLICY(0, 1, 0, 0, 0), NULL, 0);
     ASSERT_ON_ERROR(retVal);
 
     retVal = sl_WlanDisconnect();
@@ -925,7 +932,7 @@ int scanWifi(int scan_table_size, int channel, int timeout, Sl_WlanNetworkEntry_
     if(retVal < 0)
        CLI_Write((_u8 *)"error\n");
 
-    setWifiConnectionState("", "", 0, -1, NOT_CONNECTED);
+    _connection_state = setWifiConnectionState("", "", 0, -1, NOT_CONNECTED);
 
     return idx;
 }
@@ -982,3 +989,110 @@ void setWifiState(WifiConnectionState state) {
     }
 }
 
+/*!
+    \brief Save the given profile
+    
+    \param[in]      ssid_name is the name of the Access point
+
+    \param[in]      password is the password of the Access Point
+
+    \param[in]      security is the security of the WiFi network. Can be:
+                        - 0 or SL_SEC_TYPE_OPEN
+                        - 1 or SL_SEC_TYPE_WEP
+                        - 2 or SL_SEC_TYPE_WPA_WPA2
+
+    \param[in]      channel is the channel where the network is generated
+
+    \return index where profile has been stored, less than 0 on error
+
+    \note this function only support MODE_AP profiles
+
+    \warning this function only support ONE profile 
+*/
+_i16 saveProfile (char* ssid_name, char* password, _u8 security, int channel) {
+
+    const SlSecParams_t sec = {
+            .Key = password, 
+            .KeyLen = pal_Strlen(password), 
+            .Type = security
+        };
+
+    const SlSecParamsExt_t sec_ext = {
+            .AnonUser = password, 
+            .AnonUserLen = pal_Strlen(password),
+            .CertIndex = 0, 
+            .EapMethod = SL_ENT_EAP_METHOD_PEAP1_MSCHAPv2, 
+            .User = password, 
+            .UserLen = pal_Strlen(password)
+        };
+
+    return sl_WlanProfileAdd(ssid_name, pal_Strlen(ssid_name), 
+            NULL, &sec, &sec_ext, channel, 0);
+}
+
+/*!
+    \brief Save the profile being used 
+
+    \return index where profile has been stored, less than 0 on error
+*/
+_i16 saveCurrentProfile() {
+    return saveProfile(_connection_state.ssid_name, 
+            _connection_state.password, _connection_state.security, 
+            _connection_state.channel);
+}
+ 
+/*!
+    \brief Get stored profile at the given index 
+
+    \param[in] index where the profile is saved
+
+    \return less than 0 on error
+*/
+_i16 getProfile(_i16 index, WifiConnectionState *profile) {
+
+    _i16 retVal = 0;
+    _i16 ssid_name_len;
+    _u8 mac[6];
+
+    SlSecParams_t sec = {.Key = "", .KeyLen = 0, .Type = 0};
+    SlGetSecParamsExt_t sec_ext = {.AnonUser = {0}, .AnonUserLen = 1, 
+                .CertIndex = 0, .EapMethod = -1, .User = {0}, .UserLen = 1};
+
+    if(_already_initialized == 0)
+        init_device();
+
+    retVal = sl_WlanProfileGet(index, profile->ssid_name, &ssid_name_len, mac, &sec, 
+            &sec_ext, &profile->channel);
+    if(retVal < 0) {
+        CLI_Write((_u8 *)"Failed to get a profile");
+        return retVal;
+    }
+
+    sec_ext.User[sec_ext.AnonUserLen] = '\0';
+    profile->ssid_name[ssid_name_len] = '\0';
+    profile->security = sec.Type;
+    pal_Memcpy(profile->password, sec_ext.User, pal_Strlen(sec_ext.User));
+
+    return retVal;
+}
+   
+/*!
+    \brief Restore stored profile at the given index 
+
+    \param[in] index where the profile is saved
+
+    \return less than 0 on error
+*/
+_i16 restoreProfile(int index) {
+    CLI_Write((_u8 * )"Restoring profile\n");
+    WifiConnectionState profile;
+    _i16 retVal;
+
+    retVal = getProfile(index, &profile);
+    if (retVal < 0) {
+        CLI_Write((_u8 * )"No profile found on index %d\n", index);
+        return retVal;
+    }
+    printWifiParams(profile);
+    setWifiState(profile);
+}

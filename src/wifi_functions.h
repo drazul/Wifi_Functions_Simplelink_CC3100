@@ -10,8 +10,15 @@
 
 #include "simplelink.h"
 #include "sl_common.h"
+
 #include <rtems.h>
 #include <stdlib.h>
+
+
+#define DEFAULT_SSID "DefaultAP"
+#define DEFAULT_PASSWORD "123456789"
+#define DEFAULT_SECURITY SL_SEC_TYPE_WPA_WPA2
+#define DEFAULT_CHANNEL 6
 
 #define SL_STOP_TIMEOUT        0xFFFF
 
@@ -51,7 +58,12 @@ typedef struct {
 } WifiConnectionState;
 
 int generateAP(char* ssid_name, char* password, _u8 security, int channel);
-_i32 connectToAP(char* ssid_name, char* password, _u8 security);
+int generateAPSaveProfile(char* ssid_name, char* password, _u8 security, int channel);
+int generateAPFromProfile(int index);
+int generateAPFromDefaultProfile();
+int generateAPFromProfileOnErrorDefault(int index);
+
+_i32 connectToAP(char* ssid_name, char* password, _u8 security, int timeout);
 _i32 wlanSetMode(int new_mode);
 
 _i32 setWlanPower(_u8 power);

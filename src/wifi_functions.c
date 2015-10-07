@@ -16,7 +16,7 @@ WifiConnectionState _connection_state = { .ssid_name = "", .password = "",
                     .security = 0, .channel = -1, .mode = NOT_CONNECTED}; ;
 
 static void SimpleLinkPingReport(SlPingReport_t *pPingReport);
-_i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security);
+_i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security, int timeout);
 _i32 initializeAppVariables();
 
 /*!
@@ -240,12 +240,12 @@ void init_device() {
                         - 0 or SL_SEC_TYPE_OPEN
                         - 1 or SL_SEC_TYPE_WEP
                         - 2 or SL_SEC_TYPE_WPA_WPA2
-
-
+    
+    \param[in]      timeout time in seconds trying connect
 
     \return         On success, zero is returned. On error, negative is returned
 */
-_i32 connectToAP(char* ssid_name, char* password, _u8 security) {
+_i32 connectToAP(char* ssid_name, char* password, _u8 security, int timeout) {
     _connection_state = setWifiConnectionState(ssid_name, password, security, -1, MODE_STATION);
 
     CLI_Write((_u8 *)"Connect to AP\n");
@@ -255,16 +255,48 @@ _i32 connectToAP(char* ssid_name, char* password, _u8 security) {
     if(_already_initialized == 0)
         init_device();
 
+    wlanSetMode(ROLE_STA);
+
     retVal = establishConnectionWithAP(_connection_state.ssid_name, 
-        _connection_state.password, _connection_state.security);
+        _connection_state.password, _connection_state.security, timeout);
 
     if(retVal < 0) {
-        CLI_Write((_u8 *)"Failed to establish connection w/ an AP \n");
+        CLI_Write((_u8 *)"Failed to establish connection with an AP \n");
+        return retVal;
     }
 
-    CLI_Write("Connection established w/ AP and IP is acquired \n");
+    CLI_Write("Connection established with AP and IP is acquired \n");
 
     return retVal;
+}
+
+/*!
+    \brief  This function is used for generate an Access Point with default 
+            configuration defines on wifi_config.h
+
+    \return error if less than 0
+*/
+int generateAPFromDefaultProfile() {
+    return generateAP(DEFAULT_SSID, DEFAULT_PASSWORD, 
+                DEFAULT_SECURITY, DEFAULT_CHANNEL);
+}
+
+/*!
+    \brief  This function is used for generate an Access Point with
+            profile saved on given index. On error generate AP on
+            default profile.
+    \param[in] index where the profile is saved
+
+    \return error if less than 0
+*/
+int generateAPFromProfileOnErrorDefault(int index) {
+    int retVal;
+    retVal = restoreProfile(index);
+    if(retVal > 0)
+        return retVal;
+    CLI_Write((_u8 *)"Generating Ap from default profile\n");
+    return generateAPFromDefaultProfile();
+
 }
 
 /*!
@@ -346,6 +378,39 @@ int generateAP(char* ssid_name, char* password, _u8 security, int channel) {
 }
 
 /*!
+    \brief This function is used for generate an Access Point
+
+    \param[in]      ssid_name is the name of the Access point
+
+    \param[in]      password is the password of the Access Point
+
+    \param[in]      security is the security of the WiFi network. Can be:
+                        - 0 or SL_SEC_TYPE_OPEN
+                        - 1 or SL_SEC_TYPE_WEP
+                        - 2 or SL_SEC_TYPE_WPA_WPA2
+
+    \param[in]      channel is the channel where the network is generated
+
+
+    \return         index of saved profile, less than 0 on error
+*/
+
+int generateAPSaveProfile(char* ssid_name, char* password, _u8 security, int channel) {
+    int retVal;
+    retVal = generateAP(ssid_name, password, security, channel);
+    if(retVal != 0) {
+        CLI_Write((_u8 *)"Error on generate AP\n");
+        return -1;
+    }
+
+    retVal = saveCurrentProfile();
+    if (retVal < 0)
+        CLI_Write((_u8 *)"Error on save profile\n");
+
+    return retVal;
+}
+
+/*!
     \brief This function is used for change the operation mode of the device
 
     \param[in]      new_mode is the name of the Access point. Can be:
@@ -360,15 +425,16 @@ _i32 wlanSetMode(int new_mode) {
     _i32          retVal = -1;
     _i32          mode = -1;
 
+    if(_already_initialized == 1) {
+        sl_Stop(0);
+    }
     mode = sl_Start(0, 0, 0);
     _device_mode = mode;
     ASSERT_ON_ERROR(mode);
-
     if(mode == new_mode) return 0;
-
     if (mode == ROLE_AP) 
         while(!IS_IP_ACQUIRED(_status)) { rtems_task_wake_after(100);}
-    
+
     retVal = sl_WlanSetMode(new_mode);
     ASSERT_ON_ERROR(retVal);
 
@@ -542,14 +608,23 @@ _i32 configureSimpleLinkToDefaultState() {
     This function connects to the required AP (SSID_NAME).
     The function will return once we are connected and have acquired IP address
 
-    \param[in]  None
+    \param[in]      ssid_name is the name of the Access point
+
+    \param[in]      password is the password of the Access Point
+
+    \param[in]      security is the security of the WiFi network. Can be:
+                        - 0 or SL_SEC_TYPE_OPEN
+                        - 1 or SL_SEC_TYPE_WEP
+                        - 2 or SL_SEC_TYPE_WPA_WPA2
+    
+    \param[in]      timeout time in seconds trying connect
 
     \return     0 on success, negative error-code on error
 
     \warning    If the WLAN connection fails or we don't acquire an IP address,
                 We will be stuck in this function forever.
 */
-_i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security) {
+_i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security, int timeout) {
 
     SlSecParams_t secParams;
 
@@ -560,15 +635,16 @@ _i32 establishConnectionWithAP(char* ssid_name, char* password, _u8 security) {
     secParams.Type = security;
 
     retVal = sl_WlanConnect(ssid_name, pal_Strlen(ssid_name), NULL, &secParams, NULL);
-
+    printf("retVal %d\n", retVal);
     ASSERT_ON_ERROR(retVal);
 
-    while((!IS_CONNECTED(_status)) || (!IS_IP_ACQUIRED(_status))) {
+    while(((!IS_CONNECTED(_status)) || (!IS_IP_ACQUIRED(_status))) && timeout > 0) {
         CLI_Write((_u8 *)"Connecting...\n");
-        rtems_task_wake_after(100); 
+        rtems_task_wake_after(1000);
+        timeout--;
     }
 
-    return SUCCESS;
+    return timeout > 0 ? retVal : -1;
 }
 
 /*!
@@ -723,7 +799,8 @@ _u32 getOwnIP() {
     _u8 len = sizeof(SlNetCfgIpV4Args_t);
     _u8 dhcpIsOn = 0;
     SlNetCfgIpV4Args_t ipV4 = {0};
-    if(_device_mode == ROLE_STA)
+
+    if(_device_mode != ROLE_AP)
         sl_NetCfgGet(SL_IPV4_STA_P2P_CL_GET_INFO, &dhcpIsOn, &len, (_u8 *) &ipV4);
     else
         sl_NetCfgGet(SL_IPV4_AP_P2P_GO_GET_INFO, &dhcpIsOn, &len, (_u8 *) &ipV4);
@@ -985,7 +1062,7 @@ void setWifiState(WifiConnectionState state) {
         break;
         case MODE_STATION:
             connectToAP(state.ssid_name, state.password, 
-                state.security);
+                state.security, 5);
     }
 }
 
@@ -1075,7 +1152,7 @@ _i16 getProfile(_i16 index, WifiConnectionState *profile) {
 
     return retVal;
 }
-   
+
 /*!
     \brief Restore stored profile at the given index 
 
